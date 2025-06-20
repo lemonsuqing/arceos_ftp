@@ -409,3 +409,22 @@ pub mod modules {
     #[cfg(feature = "multitask")]
     pub use axtask;
 }
+
+/// 重新导出硬件抽象层模块
+pub use axhal;
+
+#[cfg(any(feature = "fs", feature = "net", feature = "display"))]
+pub use axdriver;
+
+#[cfg(any(feature = "fs", feature = "net", feature = "display"))]
+pub use axdriver::drivers;
+
+/// 顶层系统初始化函数，供外部调用
+pub fn system_init() {
+    axhal::platform_init();
+
+    #[cfg(any(feature = "fs", feature = "net", feature = "display"))]
+    axdriver::drivers::init_drivers();
+
+    // 其他初始化代码
+}

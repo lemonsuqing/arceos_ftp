@@ -68,7 +68,7 @@ extern crate alloc;
 mod macros;
 
 mod bus;
-mod drivers;
+pub mod drivers;
 mod dummy;
 mod structs;
 

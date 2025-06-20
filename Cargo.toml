@@ -27,7 +27,6 @@ members = [
     "examples/helloworld",
     "examples/httpclient",
     "examples/httpserver",
-    "examples/httpserver",
     "examples/shell",
 ]
 

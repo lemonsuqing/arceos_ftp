@@ -174,3 +174,12 @@ cfg_if::cfg_if! {
         }
     }
 }
+
+pub mod pl061_poweroff;
+
+// 新增驱动初始化函数示例，调用您的GPIO关机驱动初始化
+pub fn init_drivers() {
+    // 其他驱动初始化...
+
+    pl061_poweroff::gpio_poweroff_init();
+}
