@@ -2,7 +2,33 @@ pub mod mem;
 
 use crate::mem::phys_to_virt;
 use crate::misc::terminate;
-use core::arch::asm;
+// use core::arch::asm;
+use core::fmt::{self, Write};
+use crate::platform::aarch64_common::pl011::putchar;
+
+pub struct UartWriter;
+
+impl Write for UartWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for b in s.bytes() {
+            putchar(b);
+        }
+        Ok(())
+    }
+}
+
+macro_rules! uprint {
+    ($($arg:tt)*) => {{
+        let _ = core::fmt::write(&mut UartWriter, format_args!($($arg)*));
+    }};
+}
+
+macro_rules! uprintln {
+    () => { uprint!("\n") };
+    ($fmt:expr) => { uprint!(concat!($fmt, "\n")) };
+    ($fmt:expr, $($arg:tt)*) => { uprint!(concat!($fmt, "\n"), $($arg)*) };
+}
+
 
 #[cfg(feature = "smp")]
 pub mod mp;
@@ -74,7 +100,7 @@ pub fn init_gpio_interrupt() {
     // 使能 GPIO 第3号引脚中断的位掩码
     const GPIO_PIN3_ENABLE_BIT: u8 = 1 << 3;
 
-    info!("Enabling GPIO pin 3 interrupt");
+    uprintln!("Enabling GPIO pin 3 interrupt");
 
     unsafe {
         let interrupt_enable_reg = gpio_virt_addr.add(GPIO_INTERRUPT_ENABLE_OFFSET) as *mut u8;
@@ -88,38 +114,45 @@ pub fn init_gpio_interrupt() {
 
         const GPIO_IRQ_NUMBER: usize = 39;
 
-        info!("Registering GPIO IRQ handler at IRQ number {}", GPIO_IRQ_NUMBER);
+        uprintln!("Registering GPIO IRQ handler at IRQ number {}", GPIO_IRQ_NUMBER);
         register_handler(GPIO_IRQ_NUMBER, gpio_interrupt_handler);
         irq::set_enable(GPIO_IRQ_NUMBER, true);
     }
 
-    info!("GPIO interrupt setup completed");
+    uprintln!("GPIO interrupt setup completed");
 }
 
 pub fn gpio_interrupt_handler() {
-    use core::arch::asm;
-
     let gpio_phys_addr = pa!(axconfig::devices::GPIO_PADDR);
     let gpio_virt_addr = phys_to_virt(gpio_phys_addr).as_mut_ptr();
 
-    // GPIO 中断清除寄存器偏移
     const GPIO_INTERRUPT_CLEAR_OFFSET: usize = 0x41c;
     const GPIO_PIN3_CLEAR_BIT: u32 = 1 << 3;
 
-    info!("GPIO interrupt triggered: executing power off sequence");
+    uprintln!("GPIO interrupt triggered: executing power off sequence");
 
     unsafe {
-        let interrupt_clear_reg = gpio_virt_addr.add(GPIO_INTERRUPT_CLEAR_OFFSET) as *mut u32;
-        let current_val = core::ptr::read_volatile(interrupt_clear_reg);
-        info!("GPIO Interrupt Clear Register before clearing: {:#x}", current_val);
+        // let ris = core::ptr::read_volatile(gpio_virt_addr.add(0x414) as *const u32);
+        // let mis = core::ptr::read_volatile(gpio_virt_addr.add(0x418) as *const u32);
+        // uprintln!("GPIO RIS before clear: {:#x}", ris);
+        // uprintln!("GPIO MIS before clear: {:#x}", mis);
 
-        // 清除 GPIO3 中断标志位
+        let interrupt_clear_reg = gpio_virt_addr.add(GPIO_INTERRUPT_CLEAR_OFFSET) as *mut u32;
+
+        // 写1清除中断
         core::ptr::write_volatile(interrupt_clear_reg, GPIO_PIN3_CLEAR_BIT);
 
-        // 触发关机指令
-        info!("Bye~");
-        // asm!("mov w0, #0x18");
-        // asm!("hlt #0xF000");
+        // // 再读RIS和MIS，检查中断是否被清除
+        // let ris_after = core::ptr::read_volatile(gpio_virt_addr.add(0x414) as *const u32);
+        // let mis_after = core::ptr::read_volatile(gpio_virt_addr.add(0x418) as *const u32);
+        // uprintln!("GPIO RIS after clear: {:#x}", ris_after);
+        // uprintln!("GPIO MIS after clear: {:#x}", mis_after);
+
+        // // ICR通常读0不影响
+        // let icr_after_clear = core::ptr::read_volatile(interrupt_clear_reg);
+        // uprintln!("GPIO ICR after clear: {:#x}", icr_after_clear);
+
+        uprintln!("\x1b[1;32mBye~\x1b[0m");
         terminate();
     }
 }

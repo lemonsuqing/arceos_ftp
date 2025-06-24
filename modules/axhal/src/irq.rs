@@ -1,5 +1,31 @@
 //! Interrupt management.
 
+use core::fmt::{self, Write};
+use crate::platform::aarch64_common::pl011::putchar;
+
+pub struct UartWriter;
+
+impl Write for UartWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for b in s.bytes() {
+            putchar(b);
+        }
+        Ok(())
+    }
+}
+
+macro_rules! uprint {
+    ($($arg:tt)*) => {{
+        let _ = core::fmt::write(&mut UartWriter, format_args!($($arg)*));
+    }};
+}
+
+macro_rules! uprintln {
+    () => { uprint!("\n") };
+    ($fmt:expr) => { uprint!(concat!($fmt, "\n")) };
+    ($fmt:expr, $($arg:tt)*) => { uprint!(concat!($fmt, "\n"), $($arg)*) };
+}
+
 use axcpu::trap::{IRQ, register_trap_handler};
 use handler_table::HandlerTable;
 
@@ -15,7 +41,10 @@ static IRQ_HANDLER_TABLE: HandlerTable<MAX_IRQ_COUNT> = HandlerTable::new();
 /// Platform-independent IRQ dispatching.
 #[allow(dead_code)]
 pub(crate) fn dispatch_irq_common(irq_num: usize) {
-    trace!("IRQ {}", irq_num);
+    if irq_num == 39
+        {uprintln!("\n\x1b[1;33mIRQ {}\x1b[0m", irq_num);}
+    else
+        {trace!("IRQ {}", irq_num);}
     if !IRQ_HANDLER_TABLE.handle(irq_num) {
         warn!("Unhandled IRQ {}", irq_num);
     }
